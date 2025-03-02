@@ -15,7 +15,9 @@ import warnings
 DATA_DIR = os.getenv('KAGRA_DATA_DIR', '/data/KAGRA/raw')
 
 def give_group_v2(a):
-    """Extract group from channel string, e.g., 'K1:PEM-VOLT_AS_TABLE_GND_OUT_DQ' -> 'PEM'."""
+    """
+    Extract group from channel string, e.g., 'K1:PEM-VOLT_AS_TABLE_GND_OUT_DQ' -> 'PEM'.
+    """
     try:
         return a.split(':')[1].split('_')[0]
     except (IndexError, AttributeError):
@@ -23,7 +25,9 @@ def give_group_v2(a):
         return 'UNKNOWN'
 
 def get_strain_data(starttime, endtime, duration, ifo='K1', source_gwf=None, base_dir=None):
-    """Retrieve strain data for K1 over the given time interval."""
+    """
+    Retrieve strain data for K1 over the given time interval.
+    """
     try:
         if ifo != 'K1':
             raise ValueError(f"Unsupported interferometer: {ifo}. Must be 'K1'.")
@@ -53,7 +57,9 @@ def get_strain_data(starttime, endtime, duration, ifo='K1', source_gwf=None, bas
         return None
 
 def get_frame_files(starttime, endtime, duration, ifo, directory=None):
-    """Retrieve witness channel files for K1."""
+    """
+    Retrieve witness channel files for K1.
+    """
     try:
         if ifo != 'K1':
             raise ValueError(f"Unsupported interferometer: {ifo}. Must be 'K1'.")
@@ -77,7 +83,9 @@ def get_frame_files(starttime, endtime, duration, ifo, directory=None):
         return []
 
 def get_unsafe_channels(ifo):
-    """Load unsafe channels from a CSV file."""
+    """
+    Load unsafe channels from a CSV file.
+    """
     valid_ifos = ['K1']
     if ifo not in valid_ifos:
         raise ValueError(f"Unsupported interferometer: {ifo}. Must be one of {valid_ifos}.")
@@ -92,14 +100,18 @@ def get_unsafe_channels(ifo):
         raise RuntimeError(f"Error in get_unsafe_channels: {e}")
 
 def get_times(seglist, duration=3600):
-    """Generate time steps from a segment list."""
+    """
+    Generate time steps from a segment list.
+    """
     if duration <= 0:
         raise ValueError("Duration must be positive.")
     times = [np.arange(i.start, i.end, duration) for i in seglist]
     return [item for sublist in times for item in sublist]
 
 def calc_coherence(channel2, frame_files, start_time, end_time, fft, overlap, window, strain_data, channel1=None):
-    """Compute coherence between strain and witness channels, tracking zero-power warnings."""
+    """
+    Compute coherence between strain and witness channels, tracking zero-power warnings.
+    """
     t1, t2 = to_gps(start_time), to_gps(end_time)
     if not isinstance(strain_data, TimeSeries):
         raise ValueError("`strain_data` must be a TimeSeries object.")
@@ -138,7 +150,9 @@ def calc_coherence(channel2, frame_files, start_time, end_time, fft, overlap, wi
     return coh, zero_power_channels
 
 def run_coherence(channel_list, frame_files, starttime, endtime, strain_data, savedir, ifo, fft=12, overlap=6):
-    """Calculate and save coherence, logging channels with zero-power issues."""
+    """
+    Calculate and save coherence, logging channels with zero-power issues.
+    """
     if not channel_list:
         raise ValueError("Channel list cannot be empty.")
     
@@ -175,7 +189,9 @@ def run_coherence(channel_list, frame_files, starttime, endtime, strain_data, sa
         print(f"Failed to calculate or save coherence: {e}")
 
 def get_max_corr(output_dir, save=False):
-    """Process coherence CSV files to find max correlation."""
+    """
+    rocess coherence CSV files to find max correlation.
+    """
     output_dir = os.path.abspath(output_dir)
     files = glob.glob(os.path.join(output_dir, '*.csv'))
     # Exclude summary files
@@ -204,7 +220,9 @@ def get_max_corr(output_dir, save=False):
     return pd.DataFrame(vals, columns=['channel', 'max_correlation', 'frequency']) if save else pd.DataFrame()
 
 def combine_csv(dir_path, ifo):
-    """Combine coherence CSV files, filtering unsafe channels."""
+    """
+    Combine coherence CSV files, filtering unsafe channels.
+    """
     dir_path = os.path.abspath(dir_path)
     all_files = glob.glob(os.path.join(dir_path, "*.csv"))
     # Exclude summary files
@@ -246,14 +264,7 @@ def combine_csv(dir_path, ifo):
 def find_max_corr_channel(path, ifo, fft=12):
     """
     Find, for each frequency bin, the channels with the highest and second-highest coherence.
-    
-    Parameters:
-      - path (str): Directory containing CSV files.
-      - ifo (str): Interferometer identifier.
-      - fft (float): FFT length used to compute frequency bins.
-    
-    Returns:
-      DataFrame: A DataFrame with columns ['frequency', 'channel1', 'corr1', 'channel2', 'corr2'].
+    Returns: DataFrame: A DataFrame with columns ['frequency', 'channel1', 'corr1', 'channel2', 'corr2'].
     """
     frame_df = combine_csv(path, ifo)
     if frame_df.empty:
@@ -290,17 +301,7 @@ def find_max_corr_channel(path, ifo, fft=12):
 def plot_max_corr_chan(path, fft, ifo, duration, flow=0, fhigh=200):
     """
     Plot the highest and second-highest coherence channels across frequency bins.
-    
-    Parameters:
-      - path (str): Directory containing CSV files.
-      - fft (float): FFT length (used in frequency calculation).
-      - ifo (str): Interferometer identifier.
-      - flow (float): Lower frequency bound for plotting.
-      - fhigh (float): Upper frequency bound for plotting.
-      - duration (int): Duration used in plot titles.
-    
-    Returns:
-      DataFrame: The DataFrame of maximum correlation channel data.
+    Returns: DataFrame: The DataFrame of maximum correlation channel data.
     """
     try:
         # Assume the directory name is a timestamp.
