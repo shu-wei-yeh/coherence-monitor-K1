@@ -20,11 +20,7 @@ These scripts process KAGRA data in GPS time segments, using `gwpy` for GW analy
   conda env create -n igwn-py38 -f https://git.ligo.org/lscsoft/igwn-environments/-/raw/main/environments/igwn-py38.yaml
   conda activate igwn-py38
   ```
-- **Dependencies**: Install additional packages:
-  ```bash
-  pip install gwpy numpy pandas plotly gwdatafind
-  ```
-
+  
 ### Environment Variables
 - **`KAGRA_DATA_DIR`**: Directory with KAGRA `.gwf` files.
 - **`CHANNEL_DIR`**: Directory with K1 channel list CSVs.
