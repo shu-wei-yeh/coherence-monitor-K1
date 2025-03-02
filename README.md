@@ -42,7 +42,7 @@ python run_coherence.py --savedir <output_dir> --time <gps_time> --dur <duration
 - `--savedir`: Output directory (e.g., `K1_automatic`).
 - `--time`: GPS start time (e.g., `1368986010`).
 - `--dur`: Duration in seconds (default: `900`).
-- `--ifo`: Interferometer (must be `K1`).
+- `--ifo`: Interferometer (`K1`).
 
 #### Example
 ```bash
@@ -62,7 +62,7 @@ Selects witness channels with coherence > 0.2 in a specified frequency band.
 ```bash
 python select_witnesses.py --ifo K1 --time <gps_time> --savedir <coherence_dir> --lowfreq <low_freq> --highfreq <high_freq>
 ```
-- `--ifo`: Interferometer (must be `K1`).
+- `--ifo`: Interferometer (`K1`).
 - `--time`: GPS start time (optional if inferred from `savedir`).
 - `--savedir`: Directory from `run_coherence.py` (e.g., `K1_automatic/1368986010/`).
 - `--lowfreq`, `--highfreq`: Frequency range in Hz (e.g., `55`, `65`).
