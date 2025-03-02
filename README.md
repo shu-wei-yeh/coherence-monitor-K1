@@ -1,8 +1,8 @@
-# KAGRA Coherence Analysis and Witness Channel Selection
+# Coherence-Monitor for KAGRA
 
 This repository contains Python scripts for analyzing coherence between KAGRA’s K1 strain data and witness channels. The scripts identify significant witness channels for noise subtraction applications, such as DeepClean.
 
-This work builds on the original codebase developed by Siddharth Soni and Christina Reissel (MIT) for LIGO GW data analysis. It extends their coherence analysis framework by customizing it for KAGRA (K1).
+This work builds on the original codebase developed by [Siddharth Soni (MIT)](https://git.ligo.org/siddharth.soni/coherence-monitor) and [Christina Reissel (MIT)](https://git.ligo.org/christina.reissel/coherence-monitor) for LIGO GW data analysis. It extends their coherence analysis framework by customizing it for KAGRA (K1).
 ## Overview
 
 The workflow consists of three main scripts:
