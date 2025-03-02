@@ -7,7 +7,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.offline
 
-import gwdatafind
 from gwpy.time import to_gps, from_gps
 from gwpy.segments import DataQualityFlag, SegmentList
 from gwpy.timeseries import TimeSeries, TimeSeriesDict

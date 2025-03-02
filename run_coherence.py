@@ -2,7 +2,6 @@
 import os
 import argparse
 import time
-
 import pandas as pd
 import plotly.express as px
 import plotly.offline
