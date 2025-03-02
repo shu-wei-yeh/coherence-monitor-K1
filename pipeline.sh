@@ -3,7 +3,7 @@
 ########################## ONLY CHANGE INFO HERE ###################################
 IFO="K1"
 TIME=1368986010
-DURATION=128
+DURATION=900
 OUTTIME=$((TIME + DURATION))
 LOW_FREQ=175.0
 HIGH_FREQ=185.0

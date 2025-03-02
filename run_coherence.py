@@ -16,7 +16,7 @@ CHANNEL_DIR = os.getenv('CHANNEL_DIR', '/home/shu-wei.yeh/coherence-monitor/chan
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'Coherence Processing Script')
     parser.add_argument('--date', type = str, help = 'Date in YYYY-MM-DD format')
-    parser.add_argument('--time', type = float, help = 'GPS start time', default=None)
+    parser.add_argument('--time', type = float, help = 'GPS start time', default = None)
     parser.add_argument('--dur', type = float, default = 900.0, help = 'Duration in seconds')
     parser.add_argument('--ifo', type = str, default = 'K1', help = 'Interferometer (default: K1)')
     parser.add_argument('--savedir', default = os.curdir, type = str, help = 'Output directory')
@@ -108,13 +108,15 @@ if __name__ == '__main__':
         labels = {'max_correlation': 'Max Coherence', 'frequency': 'Frequency [Hz]'}
         )
     
-    fig.update_layout(title=dict(text=f"Max Coherence {time_} -- {time_ + args.dur}",
-                                 font=dict(family="Courier New, monospace", size=28, color="Blue")),
-                      legend=dict(font=dict(size=20)))
+    fig.update_layout(
+        title = dict(text = f"Max Coherence {time_} -- {time_ + args.dur}", 
+                     font = dict(family = "Courier New, monospace", size = 28, color = "Blue")), 
+                     legend = dict(font = dict(size = 20))
+                     )
     
-    fig.update_traces(marker=dict(size=20, opacity=0.8))
+    fig.update_traces(marker = dict(size = 20, opacity = 0.8))
     
     plot_dir = 'plots'
-    os.makedirs(plot_dir, exist_ok=True)
-    plotly.offline.plot(fig, filename=os.path.join(plot_dir, f'scatter_coh_{int(time_)}_{args.dur}s.html'))
+    os.makedirs(plot_dir, exist_ok = True)
+    plotly.offline.plot(fig, filename = os.path.join(plot_dir, f'scatter_coh_{int(time_)}_{args.dur}s.html'))
     print(f"Plot saved to {plot_dir}")
