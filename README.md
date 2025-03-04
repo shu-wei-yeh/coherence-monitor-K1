@@ -113,4 +113,3 @@ bash pipeline.sh
 - **Format**: Strain channel followed by witness channels.
 =======
 - **Format**: Strain channel followed by witness channels.
->>>>>>> d8d3dc1f4dcc83faa669c86732a2b5475ba5e624
