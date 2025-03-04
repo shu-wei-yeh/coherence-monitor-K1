@@ -77,7 +77,8 @@ python select_witnesses.py --ifo K1 --time 1368986010 --savedir K1_automatic/136
 ### Full Pipeline (`pipeline.sh`)
 Automates both steps. 
 Run it:
-```bash pipeline.sh
+```bash
+bash pipeline.sh
 ```
 
 ## Interpreting Outputs
