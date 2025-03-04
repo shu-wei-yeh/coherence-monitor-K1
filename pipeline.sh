@@ -5,8 +5,8 @@ IFO="K1"
 TIME=1368986010
 DURATION=900
 OUTTIME=$((TIME + DURATION))
-LOW_FREQ=175.0
-HIGH_FREQ=185.0
+LOW_FREQ=55.0
+HIGH_FREQ=65.0
 
 # Paths to Python scripts (adjust as needed)
 RUN_COHERENCE_SCRIPT="./run_coherence.py"
@@ -23,27 +23,29 @@ SELECT_WITNESSES_SCRIPT="./select_witnesses.py"
 #     exit 1
 # }
 
-# Check if Python scripts exist
-for script in "$RUN_COHERENCE_SCRIPT" "$SELECT_WITNESSES_SCRIPT"; do
-    if [[ ! -f "$script" ]]; then
-        echo "Error: Script '$script' not found."
-        exit 1
-    fi
-done
+# # Check if Python scripts exist
+# for script in "$RUN_COHERENCE_SCRIPT" "$SELECT_WITNESSES_SCRIPT"; do
+#     if [[ ! -f "$script" ]]; then
+#         echo "Error: Script '$script' not found."
+#         exit 1
+#     fi
+# done
 
 # Run coherence calculation
-echo "Running run_coherence.py for TIME=${TIME}..."
+echo "Running run_coherence.py for TIME=${TIME} with frequency range ${LOW_FREQ}-${HIGH_FREQ} Hz..."
 python "$RUN_COHERENCE_SCRIPT" \
     --savedir "${IFO}_automatic" \
     --time "$TIME" \
     --dur "$DURATION" \
-    --ifo "$IFO" || {
+    --ifo "$IFO" \
+    --lowfreq "$LOW_FREQ" \
+    --highfreq "$HIGH_FREQ" || {
     echo "Error: run_coherence.py failed."
     exit 1
 }
 
 # Run witness selection
-echo "Running select_witnesses.py for TIME=${TIME}..."
+echo "Running select_witnesses.py for TIME=${TIME} with frequency range ${LOW_FREQ}-${HIGH_FREQ} Hz..."
 python "$SELECT_WITNESSES_SCRIPT" \
     --ifo "$IFO" \
     --time "$TIME" \

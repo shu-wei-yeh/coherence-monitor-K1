@@ -16,12 +16,12 @@ SELECT_WITNESSES_SCRIPT="./select_witnesses.py"
 
 # Initialize Conda environment
 # Source the Conda setup script (adjust path based on your system)
-# CONDA_BASE=$(conda info --base)
-# source "${CONDA_BASE}/etc/profile.d/conda.sh"
-# conda activate igwn-py38 || {
-#     echo "Error: Failed to activate conda environment 'igwn-py38'."
-#     exit 1
-# }
+CONDA_BASE=$(conda info --base)
+source "${CONDA_BASE}/etc/profile.d/conda.sh"
+conda activate igwn-py38 || {
+    echo "Error: Failed to activate conda environment 'igwn-py38'."
+    exit 1
+}
 
 # Check if Python scripts exist
 for script in "$RUN_COHERENCE_SCRIPT" "$SELECT_WITNESSES_SCRIPT"; do
@@ -34,7 +34,7 @@ done
 # Process each time in the array
 for TIME in "${TIMES[@]}"; do
     OUTTIME=$((TIME + DURATION))
-    echo "Processing TIME=${TIME}..."
+    echo "Processing TIME=${TIME} with frequency range ${LOW_FREQ}-${HIGH_FREQ} Hz..."
 
     # Run coherence calculation
     echo "Running run_coherence.py for TIME=${TIME}..."
@@ -42,7 +42,9 @@ for TIME in "${TIMES[@]}"; do
         --savedir "${IFO}_automatic" \
         --time "$TIME" \
         --dur "$DURATION" \
-        --ifo "$IFO" || {
+        --ifo "$IFO" \
+        --lowfreq "$LOW_FREQ" \
+        --highfreq "$HIGH_FREQ" || {
         echo "Error: run_coherence.py failed for TIME=${TIME}."
         continue  # Skip to next time if this one fails
     }

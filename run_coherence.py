@@ -1,7 +1,8 @@
-#!/usr/bin/env python
+##!/usr/bin/env python
 import os
 import argparse
 import time
+
 import pandas as pd
 import plotly.express as px
 import plotly.offline
@@ -10,9 +11,8 @@ import multiprocessing as mp
 from gwpy.time import to_gps
 from gwpy.segments import Segment, SegmentList
 from utils import (get_times, run_coherence, get_max_corr, get_frame_files,
-                   get_strain_data)
+                   get_strain_data, give_group_v2, create_coherence_plot)
 
-# Configurable channel directory
 CHANNEL_DIR = os.getenv('CHANNEL_DIR',
                         '/home/shu-wei.yeh/coherence-monitor/channel_files')
 
@@ -27,6 +27,10 @@ if __name__ == '__main__':
                         help='Interferometer (default: K1)')
     parser.add_argument('--savedir', default=os.curdir, type=str,
                         help='Output directory')
+    parser.add_argument('--lowfreq', type=float, required=True,
+                        help='Lower frequency boundary')
+    parser.add_argument('--highfreq', type=float, required=True,
+                        help='Upper frequency boundary')
     args = parser.parse_args()
 
     if args.date:
@@ -44,12 +48,10 @@ if __name__ == '__main__':
     print(f"Processing GPS time: {time_}")
 
     channel_path = os.path.join(CHANNEL_DIR, args.ifo)
-
     channel_types = [
-        'asc', 'cal', 'imc', 'lsc', 'mic', 'omc', 'pem', 'psl', 'related',
-        'tms', 'vis', 'volt'
+        'volt', 'asc', 'cal', 'imc'  # Limited to 'volt' as per your modification
     ]
-    
+
     channels = {}
     for ct in channel_types:
         try:
@@ -68,11 +70,14 @@ if __name__ == '__main__':
 
     def process_coherence(channel_type, channel_list, ifo, t0, strain_data,
                           savedir, dur):
+        """Process coherence and create line plots for a channel group."""
         files_ = get_frame_files(t0, t0 + dur, dur, ifo=ifo)
         if not files_:
             print(f"No frame files for {channel_type} channels.")
             return
         print(f"Processing {channel_type} with {len(files_)} files.")
+        
+        # Run coherence calculation
         run_coherence(
             channel_list=channel_list,
             frame_files=files_,
@@ -83,6 +88,29 @@ if __name__ == '__main__':
             savedir=savedir,
         )
 
+        # Prepare DataFrame for plotting
+        outdir = os.path.join(savedir, str(int(t0)))
+        coherence_data = []
+        for chan in channel_list:
+            sanitized_channel = chan.replace(':', '_').replace('-', '_')
+            csv_file = os.path.join(outdir, f"{sanitized_channel}_{int(t0)}_{int(t0 + dur)}.csv")
+            if os.path.exists(csv_file):
+                df = pd.read_csv(csv_file, header=None, names=['Frequency [Hz]', 'Coherence'])
+                df['Channel'] = chan
+                coherence_data.append(df)
+        
+        if coherence_data:
+            combined_df = pd.concat(coherence_data, ignore_index=True)
+            create_coherence_plot(
+                df=combined_df,
+                group_name=channel_type,
+                segment_start=int(t0),
+                segment_end=int(t0 + dur),
+                output_dir=savedir,
+                freq_low=args.lowfreq,
+                freq_high=args.highfreq,
+            )
+
     with mp.Pool(processes=4) as pool:
         pool.starmap(
             process_coherence,
@@ -91,7 +119,8 @@ if __name__ == '__main__':
         )
 
     output_dir = os.path.join(args.savedir, f'{int(time_)}')
-    vals = get_max_corr(output_dir, save=True)
+    vals = get_max_corr(output_dir, restrict_freq_low=args.lowfreq,
+                        restrict_freq_high=args.highfreq, save=True)
     if vals.empty:
         raise ValueError("No coherence data found.")
 
@@ -99,6 +128,7 @@ if __name__ == '__main__':
         return a.split('_')[2] if len(a.split('_')) > 2 else 'UNKNOWN'
 
     vals['group'] = vals['channel'].apply(give_group)
+
     fig = px.scatter(
         vals,
         x="frequency",
@@ -108,16 +138,17 @@ if __name__ == '__main__':
         labels={"max_correlation": "Max Coherence", "frequency": "Frequency [Hz]"},
     )
     fig.update_layout(
-        title=dict(
-            text=f"Max Coherence {time_} -- {time_ + args.dur}",
-            font=dict(family="Courier New, monospace", size=28, color="Blue"),
-        ),
-        legend=dict(font=dict(size=20)),
+        title={
+            "text": f"Max Coherence from ({time_} -- {time_ + args.dur})",
+            "font": {"family": "Courier New, monospace", "size": 28,
+                     "color": "RebeccaPurple"},
+        },
+        font_size=28,
     )
     fig.update_traces(marker=dict(size=20, opacity=0.8))
 
     plot_dir = 'plots'
     os.makedirs(plot_dir, exist_ok=True)
-    plotly.offline.plot(fig, filename=os.path.join(plot_dir,
-                        f'scatter_coh_{int(time_)}_{args.dur}s.html'))
+    plot_filename = f'scatter_coh_{int(time_)}_{args.dur}s.html'
+    plotly.offline.plot(fig, filename=os.path.join(plot_dir, plot_filename))
     print(f"Plot saved to {plot_dir}")

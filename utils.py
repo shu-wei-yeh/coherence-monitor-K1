@@ -15,6 +15,10 @@ from gwpy.frequencyseries import FrequencySeries
 # Configurable base directory for KAGRA data
 DATA_DIR = os.getenv('KAGRA_DATA_DIR', '/data/KAGRA/raw')
 
+# Frequency range constants for coherence analysis (adjustable here only)
+RESTRICT_FREQ_LOW = 1    # Lower frequency bound in Hz
+RESTRICT_FREQ_HIGH = 200 # Upper frequency bound in Hz
+
 
 def give_group_v2(a):
     """Extract group from channel string.
@@ -201,13 +205,32 @@ def run_coherence(channel_list, frame_files, starttime, endtime, strain_data,
         print(f"Failed to calculate or save coherence: {e}")
 
 
-def get_max_corr(output_dir, save=False):
-    """Process coherence CSV files to find maximum correlation."""
+def get_max_corr(output_dir, restrict_freq_low=RESTRICT_FREQ_LOW,
+                 restrict_freq_high=RESTRICT_FREQ_HIGH, save=False):
+    """Process coherence CSV files to find maximum correlation.
+
+    Args:
+        output_dir (str): Directory containing coherence CSV files.
+        restrict_freq_low (float): Lower frequency bound (default: RESTRICT_FREQ_LOW).
+        restrict_freq_high (float): Upper frequency bound (default: RESTRICT_FREQ_HIGH).
+        save (bool): If True, return a DataFrame with max correlation data.
+
+    Returns:
+        pd.DataFrame: Columns ['channel', 'max_correlation', 'frequency'] if save is True,
+                      otherwise an empty DataFrame.
+    """
     output_dir = os.path.abspath(output_dir)
     files = glob.glob(os.path.join(output_dir, '*.csv'))
-    files = [f for f in files if 'max_corr_output' not in os.path.basename(f)]
+    files = [
+        f for f in files
+        if 'max_corr_output' not in os.path.basename(f) and
+           'zero_power_channels' not in os.path.basename(f)
+    ]
     if not files:
         raise FileNotFoundError(f"No coherence CSV files found in {output_dir}")
+
+    if restrict_freq_low >= restrict_freq_high:
+        raise ValueError("restrict_freq_low must be less than restrict_freq_high")
 
     vals = []
     for file_path in files:
@@ -218,7 +241,11 @@ def get_max_corr(output_dir, save=False):
             if len(fs.frequencies) < 2:
                 raise ValueError("Insufficient frequency points.")
             n_diff = fs.frequencies.value[1] - fs.frequencies.value[0]
-            ind1, ind2 = int(1 / n_diff), int(200 / n_diff)
+            ind1, ind2 = int(restrict_freq_low / n_diff), int(restrict_freq_high / n_diff)
+            if ind1 >= ind2 or ind1 < 0 or ind2 > len(fs.frequencies):
+                print(f"Warning: Frequency range {restrict_freq_low}-{restrict_freq_high} Hz "
+                      f"out of bounds for {file_path}. Skipping.")
+                continue
             fs_sub = fs[ind1:ind2]
             max_value = fs_sub.max().value
             max_value_frequency = fs_sub.frequencies[fs_sub.argmax()].value
@@ -227,8 +254,10 @@ def get_max_corr(output_dir, save=False):
         except Exception as e:
             print(f"Failed to process file {file_path}: {e}")
 
-    return pd.DataFrame(vals,
-                        columns=['channel', 'max_correlation', 'frequency']) if save else pd.DataFrame()
+    return pd.DataFrame(
+        vals,
+        columns=['channel', 'max_correlation', 'frequency']
+    ) if save else pd.DataFrame()
 
 
 def combine_csv(dir_path, ifo):
@@ -370,3 +399,52 @@ def plot_max_corr_chan(path, fft, ifo, duration, flow=0, fhigh=200):
     except Exception as e:
         print(f"An error occurred during plotting: {e}")
         return pd.DataFrame()
+
+
+def create_coherence_plot(df, group_name, segment_start, segment_end, output_dir,
+                          freq_low=RESTRICT_FREQ_LOW, freq_high=RESTRICT_FREQ_HIGH,
+                          linewidth=2):
+    """Create a line plot of coherence for a group of channels.
+
+    Args:
+        df (pd.DataFrame): DataFrame with 'Frequency [Hz]', 'Coherence', and 'Channel' columns.
+        group_name (str): Name of the channel group (e.g., 'PEM', 'OMC').
+        segment_start (int): Start GPS time of the segment.
+        segment_end (int): End GPS time of the segment.
+        output_dir (str): Base directory to save the plot.
+        freq_low (float): Lower frequency bound for the x-axis (default: RESTRICT_FREQ_LOW).
+        freq_high (float): Upper frequency bound for the x-axis (default: RESTRICT_FREQ_HIGH).
+        linewidth (int): Width of the plot lines (default: 2).
+    """
+    if df.empty:
+        print(f"No data to plot for {group_name}, segment {segment_start}-{segment_end}")
+        return
+
+    fig = px.line(
+        df,
+        x='Frequency [Hz]',
+        y='Coherence',
+        color='Channel',
+        title=f'Coherence between strain and {group_name} channels '
+              f'({segment_start} to {segment_end})',
+        labels={'Frequency [Hz]': 'Frequency [Hz]', 'Coherence': 'Coherence'}
+    )
+    # Update line width for all traces
+    for trace in fig.data:
+        trace.line.width = linewidth
+
+    fig.update_layout(
+        yaxis_range=[0, 1],
+        xaxis_range=[freq_low, freq_high],
+        font=dict(size=18),
+        legend_title=dict(font=dict(size=18))
+    )
+
+    # Create output directory structure
+    plot_dir = os.path.join(output_dir, str(segment_start), group_name)
+    os.makedirs(plot_dir, exist_ok=True)
+    output_file = os.path.join(plot_dir,
+                               f"coh_plot_{group_name}_{freq_low}Hz-{freq_high}Hz_"
+                               f"{segment_start}_{segment_end}.html")
+    fig.write_html(output_file)
+    print(f"Saved plot to {output_file}")
