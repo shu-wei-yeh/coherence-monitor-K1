@@ -23,15 +23,6 @@ These scripts process KAGRA data in GPS time segments, using `gwpy` for GW analy
   conda activate igwn-py38
   ```
   
-### Environment Variables
-- **`KAGRA_DATA_DIR`**: Directory with KAGRA `.gwf` files.
-- **`CHANNEL_DIR`**: Directory with K1 channel list CSVs.
-  Set these variables:
-  ```bash
-  export KAGRA_DATA_DIR="/path/to/kagra/data"
-  export CHANNEL_DIR="/path/to/k1/channels"
-  ```
-  
 ## Usage
 
 ### Step 1: Compute coherence (`run_coherence.py`)
