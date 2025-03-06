@@ -55,7 +55,6 @@ if __name__ == '__main__':
     print(f"Processing GPS time: {time_}")
 
     channel_path = os.path.join(CHANNEL_DIR, args.ifo)
-    channel_types = ['volt']
     channel_types = [
         "asc", "cal", "imc", "lsc", "mic", "omc", 
         "pem", "psl", "related", "tms", "vis", "volt" # Can be limited to 'volt' for a quick and simple test if needed.
