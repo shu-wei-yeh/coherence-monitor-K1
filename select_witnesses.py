@@ -1,4 +1,9 @@
 #!/usr/bin/env python
+'''
+Script to select witness channels for DeepClean based on coherence analysis.
+Generates plots, saves coherence data, and creates a channel list from KAGRA (K1) data.
+'''
+
 import argparse
 import os
 import pandas as pd
@@ -19,10 +24,13 @@ parser.add_argument('--dur', type=float, default=900.0,
 args = parser.parse_args()
 
 savedir_abs = os.path.abspath(args.savedir)
+
+# Determine start time: use --time if provided, else infer from directory name
 time_val = args.time or int(
     os.path.basename(savedir_abs) if os.path.basename(savedir_abs).isdigit()
     else os.path.basename(os.path.dirname(savedir_abs))
 )
+# Validate that time_val is numeric
 if not isinstance(time_val, (int, float)):
     raise ValueError(f"Could not determine time from --time or savedir '{args.savedir}'")
 print(f"Using time: {time_val}")
@@ -30,41 +38,50 @@ print(f"Using time: {time_val}")
 print("Generating coherence plots...")
 vals = plot_max_corr_chan(
     args.savedir,
-    fft=12,
+    fft=10,
     ifo=args.ifo,
-    flow=args.lowfreq,
-    fhigh=args.highfreq,
+    flow=args.lowfreq,    # Lower frequency bound for plotting
+    fhigh=args.highfreq,  # Upper frequency bound for plotting
     duration=args.dur,
 )
 if vals.empty:
     raise ValueError("No coherence data found.")
 
+# Display a preview of the top coherence values
 print("Preview of coherence data:")
 print(vals[['frequency', 'corr1', 'corr2']].head())
 
+# Save coherence data to CSV
 output_csv = os.path.join(args.savedir, f"max_corr_output_{time_val}.csv")
 vals.to_csv(output_csv, index=False)
 print(f"Saved to {output_csv}")
 
+# Save coherence data as a text file for checking
 output_txt = os.path.join(args.savedir, f"max_corr_output_{time_val}.txt")
 with open(output_txt, "w") as f:
     f.write(vals.to_string())
 print(f"Saved to {output_txt}")
 
 print("Selecting witness channels...")
+
+# Select witness channels based on coherence thresholds
 vals_selc = vals[
-    (vals['frequency'] > args.lowfreq) &
+    (vals['frequency'] > args.lowfreq) &             # Filter by frequency range
     (vals['frequency'] < args.highfreq) &
-    ((vals['corr1'] > 0.2) | (vals['corr2'] > 0.2))
+    ((vals['corr1'] > 0.2) | (vals['corr2'] > 0.2))  # Select channels with coherence > 0.2
 ]
+# Combine top two channels into a unique list
 channels = list(set(vals_selc['channel1'].tolist() + vals_selc['channel2'].tolist()))
 
+# Write selected channels to an .ini file for DeepClean
 chanlist_file = os.path.join(args.savedir,
                              f'chanlist_O4_{args.lowfreq}Hz-{args.highfreq}Hz.ini')
 os.makedirs(os.path.dirname(chanlist_file), exist_ok=True)
 with open(chanlist_file, 'w') as f:
+    # Write strain channel first
     f.write(f"{args.ifo}:CAL-CS_PROC_DARM_STRAIN_DBL_DQ\n")
     for c in channels:
+        # Replace first underscore with hyphen to match KAGRA naming convention
         new_c = c.replace('_', '-', 1)
         f.write(f"{new_c}\n")
 print(f"Channels written to {chanlist_file}")

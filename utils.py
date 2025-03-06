@@ -163,7 +163,7 @@ def calc_coherence(channel2, frame_files, start_time, end_time, fft, overlap,
 
 
 def run_coherence(channel_list, frame_files, starttime, endtime, strain_data,
-                  savedir, ifo, fft=12, overlap=6):
+                  savedir, ifo, fft=10, overlap=5):
     """Calculate and save coherence, logging channels with zero-power issues."""
     if not channel_list:
         raise ValueError("Channel list cannot be empty.")
@@ -207,17 +207,16 @@ def run_coherence(channel_list, frame_files, starttime, endtime, strain_data,
 
 def get_max_corr(output_dir, restrict_freq_low=RESTRICT_FREQ_LOW,
                  restrict_freq_high=RESTRICT_FREQ_HIGH, save=False):
-    """Process coherence CSV files to find maximum correlation.
+    """Find maximum coherence values from CSV files within a frequency range.
 
     Args:
-        output_dir (str): Directory containing coherence CSV files.
+        output_dir (str): Directory with coherence CSV files.
         restrict_freq_low (float): Lower frequency bound (default: RESTRICT_FREQ_LOW).
         restrict_freq_high (float): Upper frequency bound (default: RESTRICT_FREQ_HIGH).
-        save (bool): If True, return a DataFrame with max correlation data.
+        save (bool): If True, return DataFrame with results (default: False).
 
     Returns:
-        pd.DataFrame: Columns ['channel', 'max_correlation', 'frequency'] if save is True,
-                      otherwise an empty DataFrame.
+        pd.DataFrame: Columns ['channel', 'max_correlation', 'frequency'] if save=True, else empty.
     """
     output_dir = os.path.abspath(output_dir)
     files = glob.glob(os.path.join(output_dir, '*.csv'))
@@ -236,11 +235,12 @@ def get_max_corr(output_dir, restrict_freq_low=RESTRICT_FREQ_LOW,
     for file_path in files:
         try:
             base = os.path.basename(file_path)
-            chan_name = base.split('DQ')[0] + 'DQ'
+            chan_name = base.split('DQ')[0] + 'DQ' # Reconstruct channel name
             fs = FrequencySeries.read(file_path)
             if len(fs.frequencies) < 2:
                 raise ValueError("Insufficient frequency points.")
-            n_diff = fs.frequencies.value[1] - fs.frequencies.value[0]
+            # Calculate frequency bin indices
+            n_diff = fs.frequencies.value[1] - fs.frequencies.value[0] # Slice frequency range
             ind1, ind2 = int(restrict_freq_low / n_diff), int(restrict_freq_high / n_diff)
             if ind1 >= ind2 or ind1 < 0 or ind2 > len(fs.frequencies):
                 print(f"Warning: Frequency range {restrict_freq_low}-{restrict_freq_high} Hz "
@@ -261,13 +261,21 @@ def get_max_corr(output_dir, restrict_freq_low=RESTRICT_FREQ_LOW,
 
 
 def combine_csv(dir_path, ifo):
-    """Combine coherence CSV files, filtering unsafe channels."""
+    """Combine coherence CSV files into a single DataFrame, filtering unsafe channels.
+
+    Args:
+        dir_path (str): Directory containing coherence CSV files.
+
+    Returns:
+        pd.DataFrame: Combined data with frequency and coherence columns.
+    """
     dir_path = os.path.abspath(dir_path)
     all_files = glob.glob(os.path.join(dir_path, "*.csv"))
     all_files = [f for f in all_files if 'max_corr_output' not in os.path.basename(f)]
     if not all_files:
         raise FileNotFoundError(f"No coherence CSV files found in {dir_path}")
-
+    
+    # Filter out unsafe channels
     chan_removes = get_unsafe_channels(ifo=ifo)['channel']
     chan_removes = [chan.replace(':', '_').replace('-', '_') for chan in chan_removes]
     filtered_files = [
@@ -280,7 +288,7 @@ def combine_csv(dir_path, ifo):
     column_names = []
     for file_path in filtered_files:
         try:
-            base_name = os.path.basename(file_path).split('_14')[0]
+            base_name = os.path.basename(file_path).split('_14')[0] # Split at timestamp
             column_freq = f"{base_name}_freq"
             column_corr = f"{base_name}_corr"
             df = pd.read_csv(file_path, header=None)
@@ -302,8 +310,15 @@ def combine_csv(dir_path, ifo):
     return combined_df
 
 
-def find_max_corr_channel(path, ifo, fft=12):
-    """Find top two coherent channels per frequency bin."""
+def find_max_corr_channel(path, ifo, fft=10):
+    """Identify the top two most coherent channels per frequency bin.
+
+    Args:
+        fft (float): FFT length used in coherence calculation (default: 12).
+
+    Returns:
+        pd.DataFrame: Columns ['frequency', 'channel1', 'corr1', 'channel2', 'corr2'].
+    """
     frame_df = combine_csv(path, ifo)
     if frame_df.empty:
         raise ValueError(f"No valid data found in the combined CSV files at {path}.")
@@ -311,13 +326,15 @@ def find_max_corr_channel(path, ifo, fft=12):
     max_vals = []
     for i in range(len(frame_df)):
         try:
+            # Extract coherence values (every 2nd column)
             corr_values = frame_df.iloc[i, 1::2]
             corr_sorted = corr_values.sort_values(ascending=False)
-            top_columns = corr_sorted.index[:2]
+            top_columns = corr_sorted.index[:2] # Top two channels
             chan_names = []
             for col in top_columns:
                 base_name = col.replace('_corr', '')
                 parts = base_name.split('_')
+                # Find timestamp and reconstruct channel name
                 timestamp_idx = next(
                     (i for i, p in enumerate(parts) if p.isdigit() and len(p) >= 9),
                     len(parts)
@@ -326,12 +343,13 @@ def find_max_corr_channel(path, ifo, fft=12):
                 clean_name = ':'.join(clean_parts[:2]) + '_' + '_'.join(clean_parts[2:])
                 chan_names.append(clean_name)
             max_corr_vals = corr_sorted.iloc[:2].tolist()
-            freq = i / fft
+            freq = i / fft # Convert bin index to frequency
             max_vals.append((freq, chan_names[0], max_corr_vals[0],
                             chan_names[1], max_corr_vals[1]))
         except Exception as e:
             print(f"Error processing row {i}: {e}")
             continue
+    # Create DataFrame with top two channels per frequency
     df_max = pd.DataFrame(
         max_vals,
         columns=['frequency', 'channel1', 'corr1', 'channel2', 'corr2']
@@ -340,16 +358,29 @@ def find_max_corr_channel(path, ifo, fft=12):
 
 
 def plot_max_corr_chan(path, fft, ifo, duration, flow=0, fhigh=200):
-    """Plot the top two coherent channels across frequency bins."""
+    """Generate scatter plots of the top two coherent channels across frequency bins.
+
+    Args:
+        path (str): Directory with coherence data.
+        fft (float): FFT length in seconds.
+        duration (float): Time segment duration in seconds.
+        flow (float): Lower frequency bound for plotting (default: 0).
+        fhigh (float): Upper frequency bound for plotting (default: 200).
+
+    Returns:
+        pd.DataFrame: Data used for plotting or empty if failed.
+    """
     try:
         time_ = int(os.path.basename(os.path.normpath(path)))
         vals = find_max_corr_channel(path=path, fft=fft, ifo=ifo)
         print("Data acquired; generating plots...")
         vals = vals[(vals['frequency'] >= flow) & (vals['frequency'] <= fhigh)]
 
+        # Add group names for coloring
         vals['group1'] = vals['channel1'].apply(give_group_v2)
         vals['group2'] = vals['channel2'].apply(give_group_v2)
 
+        # Plot highest coherence channels
         fig1 = px.scatter(
             vals,
             x="frequency",
@@ -369,6 +400,7 @@ def plot_max_corr_chan(path, fft, ifo, duration, flow=0, fhigh=200):
         )
         fig1.update_traces(marker=dict(size=20, opacity=0.8))
 
+        # Plot 2nd-highest coherence channels
         fig2 = px.scatter(
             vals,
             x="frequency",
@@ -412,9 +444,9 @@ def create_coherence_plot(df, group_name, segment_start, segment_end, output_dir
         segment_start (int): Start GPS time of the segment.
         segment_end (int): End GPS time of the segment.
         output_dir (str): Base directory to save the plot.
-        freq_low (float): Lower frequency bound for the x-axis (default: RESTRICT_FREQ_LOW).
-        freq_high (float): Upper frequency bound for the x-axis (default: RESTRICT_FREQ_HIGH).
-        linewidth (int): Width of the plot lines (default: 2).
+        freq_low (float): Lower frequency bound for x-axis (default: RESTRICT_FREQ_LOW).
+        freq_high (float): Upper frequency bound for x-axis (default: RESTRICT_FREQ_HIGH).
+        linewidth (int): Width of plot lines (default: 2).
     """
     if df.empty:
         print(f"No data to plot for {group_name}, segment {segment_start}-{segment_end}")
