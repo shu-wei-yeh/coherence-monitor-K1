@@ -1,8 +1,8 @@
-##!/usr/bin/env python
-'''
-Script to compute coherence between K1 strain and witness channels.
-Processes data in parallel, saves coherence results, and generates visualizations.
-'''
+# ##!/usr/bin/env python
+# '''
+# Script to compute coherence between K1 strain and witness channels.
+# Processes data in parallel, saves coherence results, and generates visualizations.
+# '''
 
 import os
 import argparse
@@ -32,10 +32,6 @@ if __name__ == '__main__':
                         help='Interferometer (default: K1)')
     parser.add_argument('--savedir', default=os.curdir, type=str,
                         help='Output directory')
-    parser.add_argument('--lowfreq', type=float, required=True,
-                        help='Lower frequency boundary')
-    parser.add_argument('--highfreq', type=float, required=True,
-                        help='Upper frequency boundary')
     args = parser.parse_args()
 
     if args.date:
@@ -48,19 +44,13 @@ if __name__ == '__main__':
     else:
         raise ValueError("Either --date or --time must be provided.")
 
-    # Create a segment list with a single time segment
     seg_list = SegmentList([Segment(start_gps, end_gps)])
-    # Get the 1st time point (assuming duration matches args.dur)
     time_ = get_times(seg_list, duration=args.dur)[0]
     print(f"Processing GPS time: {time_}")
 
     channel_path = os.path.join(CHANNEL_DIR, args.ifo)
-    channel_types = [
-        "asc", "cal", "imc", "lsc", "mic", "omc", 
-        "pem", "psl", "related", "tms", "vis", "volt" # Can be limited to 'volt' for a quick and simple test if needed.
-    ]
+    channel_types = ["mic", "omc", "related", "volt"]
 
-    # Load channel lists for each type
     channels = {}
     for ct in channel_types:
         try:
@@ -79,59 +69,47 @@ if __name__ == '__main__':
 
     def process_coherence(channel_type, channel_list, ifo, t0, strain_data,
                           savedir, dur):
-        """Process coherence and generate line plots for a channel group in parallel.
-
-        Args:
-            channel_type (str): Type of channels (e.g., 'volt').
-            channel_list (list): List of channel names.
-            t0 (float): Start GPS time.
-            strain_data (TimeSeries): Strain data for coherence calculation.
-            savedir (str): Output directory.
-            dur (float): Duration in seconds.
-        """
+        """Process coherence for a single group independently."""
         files_ = get_frame_files(t0, t0 + dur, dur, ifo=ifo)
         if not files_:
             print(f"No frame files for {channel_type} channels.")
             return
         print(f"Processing {channel_type} with {len(files_)} files.")
         
-        # Run coherence calculation
+        # Use a copy of strain_data to ensure no cross-group modification
+        strain_copy = strain_data.copy()
         run_coherence(
             channel_list=channel_list,
             frame_files=files_,
             starttime=t0,
             endtime=t0 + dur,
             ifo=ifo,
-            strain_data=strain_data,
+            strain_data=strain_copy,
             savedir=savedir,
         )
-
-        # Sanitize channel name for filename
         outdir = os.path.join(savedir, str(int(t0)))
         coherence_data = []
         for chan in channel_list:
             sanitized_channel = chan.replace(':', '_').replace('-', '_')
             csv_file = os.path.join(outdir, f"{sanitized_channel}_{int(t0)}_{int(t0 + dur)}.csv")
             if os.path.exists(csv_file):
-                # Load coherence data and add channel name
                 df = pd.read_csv(csv_file, header=None, names=['Frequency [Hz]', 'Coherence'])
                 df['Channel'] = chan
                 coherence_data.append(df)
         
         if coherence_data:
-            # Combine data and create a line plot
             combined_df = pd.concat(coherence_data, ignore_index=True)
+            line_plot_dir = os.path.join(savedir, 'line_plots')
             create_coherence_plot(
                 df=combined_df,
                 group_name=channel_type,
                 segment_start=int(t0),
                 segment_end=int(t0 + dur),
-                output_dir=savedir,
-                freq_low=args.lowfreq,
-                freq_high=args.highfreq,
+                output_dir=line_plot_dir,
+                freq_low=200,
+                freq_high=400,
             )
 
-    # Process channel types in parallel using 4 processes
     with mp.Pool(processes=4) as pool:
         pool.starmap(
             process_coherence,
@@ -139,21 +117,13 @@ if __name__ == '__main__':
               args.savedir, args.dur) for ct in channel_types]
         )
 
-    # Analyze maximum coherence across all channels
     output_dir = os.path.join(args.savedir, f'{int(time_)}')
-    vals = get_max_corr(output_dir, restrict_freq_low=args.lowfreq,
-                        restrict_freq_high=args.highfreq, save=True)
+    vals = get_max_corr(output_dir, save=True)
     if vals.empty:
         raise ValueError("No coherence data found.")
 
-    def give_group(a):
-        """Extract group name from channel string (simplified version)."""
-        return a.split('_')[2] if len(a.split('_')) > 2 else 'UNKNOWN'
+    vals['group'] = vals['channel'].apply(give_group_v2)
 
-    # Add group labels for visualization
-    vals['group'] = vals['channel'].apply(give_group)
-
-    # Create a scatter plot of maximum coherence
     fig = px.scatter(
         vals,
         x="frequency",
@@ -176,4 +146,4 @@ if __name__ == '__main__':
     os.makedirs(plot_dir, exist_ok=True)
     plot_filename = f'scatter_coh_{int(time_)}_{args.dur}s.html'
     plotly.offline.plot(fig, filename=os.path.join(plot_dir, plot_filename))
-    print(f"Plot saved to {plot_dir}")
+    print(f"Scatter plot saved to {plot_dir}")
